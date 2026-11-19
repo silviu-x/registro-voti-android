@@ -1,6 +1,7 @@
 package it.registrovoti.mobile
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
@@ -37,6 +38,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.credentials.*
@@ -70,12 +72,14 @@ class MainActivity : ComponentActivity() {
             auth.addAuthStateListener(listener)
             onDispose { auth.removeAuthStateListener(listener) }
         }
-        Column(Modifier.fillMaxSize().background(Brush.horizontalGradient(LocalGradient.current)).safeDrawingPadding().imePadding().padding(if(user==null) 16.dp else 0.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (user == null && !guest) Text("Registro Voti", style = MaterialTheme.typography.headlineLarge)
-            val account = user
-            if (account == null && !guest) {
-                Text("Accedi con lo stesso account Google che usi sul sito.")
-                Button(enabled = !busy, onClick = {
+        val account = user
+        val screen = Modifier.fillMaxSize()
+            .livingBackground()
+            .safeDrawingPadding()
+            .imePadding()
+        if (account == null && !guest) {
+            EnterScreen { LoginScreen(screen, auth, busy, { busy = it }, message, { message = it },
+                guest = { guest = true }, google = {
                     busy = true
                     message = ""
                     scope.launch {
@@ -93,12 +97,10 @@ class MainActivity : ComponentActivity() {
                             message = e.localizedMessage ?: "Accesso interrotto"
                         }
                     }
-                }) { Text("Accedi con Google") }
-                EmailLogin(auth){message=it}
-                TextButton(onClick={guest=true}) {Text("Continua come ospite")}
-                Text(message)
-            } else key(account?.uid) {
-                Register(account?.uid) { guest=false; auth.signOut() }
+                }) }
+        } else Box(screen) {
+            key(account?.uid) {
+                EnterScreen { Register(account?.uid) { guest=false; auth.signOut() } }
             }
         }
     }
@@ -158,6 +160,8 @@ private fun Register(uid: String?, logout: () -> Unit) {
             true
         }.addOnSuccessListener{done(null)}.addOnFailureListener{done(it.localizedMessage ?: "Salvataggio fallito")}
     }
+    val savedNotice = remember { SnackbarHostState() }
+    val noticeScope = rememberCoroutineScope()
     var selected by remember { mutableStateOf<Map<*,*>?>(null) }
     var removing by remember { mutableStateOf<Map<*,*>?>(null) }
     var subjectFilter by rememberSaveable { mutableStateOf("Tutte") }
@@ -186,7 +190,9 @@ private fun Register(uid: String?, logout: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf("Panoramica") }
     androidx.activity.compose.BackHandler(enabled=tab!="Panoramica" && !editing){tab="Panoramica"}
     Column(Modifier.fillMaxSize()) {
-        androidx.compose.animation.Crossfade(targetState=tab,modifier=Modifier.weight(1f),label="Sezione") { visibleTab ->
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+        AnimatedContent(targetState = tab, modifier = Modifier.fillMaxSize(), label = "Sezione",
+            transitionSpec = { (fadeIn(tween(270, easing = SmoothMotion)) + slideInHorizontally(tween(320, easing = SmoothMotion)) { it / 19 }) togetherWith fadeOut(tween(190, easing = SmoothMotion)) }) { visibleTab ->
             LazyColumn(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) {
                 if (status.isNotBlank()) item { Text(status) }
                 item {
@@ -212,7 +218,7 @@ private fun Register(uid: String?, logout: () -> Unit) {
                                 listOf("Anno","1° quadr.","2° quadr.").forEach { label ->
                                     val active = period == label
                                     Box(Modifier.weight(1f).background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(11.dp))
-                                        .selectable(selected = active, onClick = { period = label }).heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
+                                        .pressMotion().selectable(selected = active, onClick = { period = label }).heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
                                         Text(label, style = MaterialTheme.typography.labelLarge,
                                             color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -376,14 +382,22 @@ private fun Register(uid: String?, logout: () -> Unit) {
                 }
             }
         }
+        SnackbarHost(savedNotice, Modifier.align(Alignment.BottomCenter))
+        }
         val destinations = listOf("Panoramica" to Icons.Outlined.Home, "Materie" to Icons.AutoMirrored.Outlined.List,
             "Voti" to Icons.Outlined.CheckCircle, "Pagella" to Icons.Outlined.DateRange,
             "Simulatore" to Icons.Outlined.AddCircle, "Impostazioni" to Icons.Outlined.Settings)
         val minimumTabWidth = 62.dp * LocalDensity.current.fontScale
-        LazyRow(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(vertical = 4.dp)) {
+        val barSurface = MaterialTheme.colorScheme.surface
+        LazyRow(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .background(Brush.verticalGradient(listOf(barSurface.copy(alpha = 0.12f), barSurface.copy(alpha = 0.65f))))
+                .padding(vertical = 4.dp)
+        ) {
             items(destinations) { (name, icon) ->
                 val selected = name == tab
-                Column(Modifier.widthIn(min = minimumTabWidth).fillParentMaxWidth(1f / destinations.size).selectable(selected = selected, onClick = { tab = name }).heightIn(min = 54.dp),
+                Column(Modifier.widthIn(min = minimumTabWidth).fillParentMaxWidth(1f / destinations.size).pressMotion().selectable(selected = selected, onClick = { tab = name }).heightIn(min = 54.dp),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Box(Modifier.size(42.dp, 26.dp).background(if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
                         RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
@@ -402,15 +416,23 @@ private fun Register(uid: String?, logout: () -> Unit) {
             Surface(shape=RoundedCornerShape(20.dp)) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
                     Text(if(selected==null) "Nuovo voto" else "Modifica voto",style=MaterialTheme.typography.titleLarge)
-                    if(status.isNotEmpty()) Text(status)
+                    AnimatedVisibility(status.isNotEmpty()) { Text(status) }
                     if(selected==null) Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=another,onCheckedChange={another=it});Text("Inserisci un altro voto dopo il salvataggio")}
-                    key(formKey){ GradeForm(subjects(data),selected,onCancel={editing=false},onSave={name,score,date,type,note,done ->
+                    key(formKey){ EnterScreen { GradeForm(subjects(data),selected,onCancel={editing=false},onSave={name,score,date,type,note,done ->
                         saving=true; status=""
                         commit(changeGrade(selected,name,score,date,type,note)){ error ->
                             saving=false;done()
-                            if(error==null){editing=another;formKey++;status="Voto salvato"} else status=error
+                            if (error == null) {
+                                editing = another
+                                formKey++
+                                if (another) status = "Voto salvato"
+                                else noticeScope.launch {
+                                    savedNotice.currentSnackbarData?.dismiss()
+                                    savedNotice.showSnackbar("Voto salvato")
+                                }
+                            } else status = error
                         }
-                    }) }
+                    }) } }
                 }
             }
         }
@@ -433,19 +455,19 @@ private fun GradeForm(names: List<String>, initial:Map<*,*>?, onCancel: ()->Unit
         OutlinedTextField(raw,{raw=it},shape=RoundedCornerShape(16.dp),label={Text("Voto, es. 7+ o 6/7")},singleLine=true)
         OutlinedTextField(date,{date=it},shape=RoundedCornerShape(16.dp),label={Text("Data AAAA-MM-GG")},singleLine=true)
         Row(horizontalArrangement=Arrangement.spacedBy(2.dp)){listOf("−","+","½").forEach{suffix->
-            TextButton(onClick={val n=raw.takeWhile(Char::isDigit);if(n.isNotEmpty()) raw=if(raw==n+suffix)n else n+suffix}){Text(suffix)}
+            TextButton(modifier=Modifier.pressMotion(),onClick={val n=raw.takeWhile(Char::isDigit);if(n.isNotEmpty()) raw=if(raw==n+suffix)n else n+suffix}){Text(suffix)}
         }}
         Choice(type,types) { type=it }
         OutlinedTextField(note,{note=it},shape=RoundedCornerShape(16.dp),label={Text("Nota")})
         if (error.isNotBlank()) Text(error)
         Row {
-            Button(enabled=!busy,onClick={
+            Button(modifier=Modifier.pressMotion(!busy),enabled=!busy,onClick={
                 val score=parseGrade(raw)
                 val day=runCatching { LocalDate.parse(date) }.getOrNull()
                 if (name.isBlank() || score==null || day==null) error="Controlla materia, voto (2–10) e data."
                 else { error=""; busy=true; onSave(name.trim(),score,day,type,note) { busy=false } }
             }) { Text(if (busy) "Salvataggio…" else "Salva voto") }
-            TextButton(enabled=!busy,onClick=onCancel) { Text("Annulla") }
+            TextButton(modifier=Modifier.pressMotion(!busy),enabled=!busy,onClick=onCancel) { Text("Annulla") }
         }
     }
 }
@@ -466,7 +488,7 @@ internal fun Choice(label: String, options: List<String>, select: (String)->Unit
 
 @Composable
 private fun BlueButton(label:String, action:()->Unit, modifier:Modifier=Modifier, active:Boolean=false) {
-    Button(onClick=action,modifier=modifier,shape=RoundedCornerShape(10.dp),
+    Button(onClick=action,modifier=modifier.pressMotion(),shape=RoundedCornerShape(10.dp),
         border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline),
         colors=ButtonDefaults.buttonColors(containerColor=if(active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,contentColor=if(active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant),
         contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text(label) }
@@ -481,6 +503,8 @@ internal fun BluePanel(centered:Boolean=false, content:@Composable ColumnScope.(
 
 @Composable
 private fun Gauge(score:Double) {
+    val target = if (score.isFinite()) score.toFloat() else 0f
+    val shown by animateFloatAsState(target, tween(620, easing = SmoothMotion), label = "Media generale")
     val colors = MaterialTheme.colorScheme
     Box(Modifier.fillMaxWidth().aspectRatio(2f),contentAlignment=Alignment.BottomCenter) {
         Canvas(Modifier.fillMaxSize()) {
@@ -493,11 +517,12 @@ private fun Gauge(score:Double) {
                 val w=size.width*.129f
                 val h=size.width*.076f
                 rotate(angle,center) {
-                    drawRoundRect(if(score.isFinite() && index<score.roundToInt()) colors.primary else colors.surfaceVariant,
+                    val fill = (shown - index).coerceIn(0f, 1f)
+                    drawRoundRect(androidx.compose.ui.graphics.lerp(colors.surfaceVariant, colors.primary, fill),
                         Offset(center.x-w/2,center.y-h/2),Size(w,h),CornerRadius(h*.24f))
                 }
             }
         }
-        Text(display(score),fontSize=42.sp,fontWeight=FontWeight.Bold,lineHeight=46.sp)
+        Text(display(if (score.isFinite() && shown != target) shown.toDouble() else score),fontSize=42.sp,fontWeight=FontWeight.Bold,lineHeight=46.sp)
     }
 }

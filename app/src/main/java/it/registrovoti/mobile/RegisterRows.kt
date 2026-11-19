@@ -1,5 +1,6 @@
 package it.registrovoti.mobile
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
@@ -28,7 +29,9 @@ internal fun SubjectLine(name: String, average: String, caption: String, open: (
             Text(name, fontWeight = FontWeight.SemiBold)
             if (caption.isNotEmpty()) Text(caption, style = MaterialTheme.typography.bodySmall)
         }
-        Text(average, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Crossfade(average, animationSpec = androidx.compose.animation.core.tween(280, easing = SmoothMotion), label = "Media materia") { value ->
+            Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
@@ -74,7 +77,7 @@ internal fun ValueLine(label: String, value: String) {
 private fun registerRowModifier(onClick: () -> Unit): Modifier {
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(12.dp)
-    return Modifier.fillMaxWidth().clip(shape)
+    return Modifier.fillMaxWidth().pressMotion().clip(shape)
         .background(colors.surfaceVariant.copy(alpha = 0.55f))
         .border(1.dp, colors.primary.copy(alpha = 0.52f), shape)
         .clickable(role = Role.Button, onClick = onClick)
@@ -92,7 +95,7 @@ internal fun RegisterAction(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).pressMotion(enabled),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, accent.copy(alpha = if (enabled) 0.65f else 0.28f)),
         colors = ButtonDefaults.outlinedButtonColors(

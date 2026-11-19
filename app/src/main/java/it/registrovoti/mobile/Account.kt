@@ -18,30 +18,6 @@ import com.google.android.libraries.identity.googleid.*
 import kotlinx.coroutines.launch
 
 @Composable
-fun EmailLogin(auth:FirebaseAuth,report:(String)->Unit) {
-    var opened by remember {mutableStateOf(false)}
-    var email by remember {mutableStateOf("")}
-    var password by remember {mutableStateOf("")}
-    var busy by remember {mutableStateOf(false)}
-    TextButton(onClick={opened=!opened}){Text("Email e password")}
-    if(opened) {
-        OutlinedTextField(email,{email=it},shape=RoundedCornerShape(16.dp),label={Text("Email")},singleLine=true)
-        OutlinedTextField(password,{password=it},shape=RoundedCornerShape(16.dp),label={Text("Password")},singleLine=true,visualTransformation=PasswordVisualTransformation())
-        listOf("Accedi","Registrati","Recupera password").forEach{label->
-            TextButton(enabled=!busy && email.isNotBlank() && (password.isNotEmpty() || label=="Recupera password"),onClick={
-                busy=true
-                val task=when(label){
-                    "Accedi" -> auth.signInWithEmailAndPassword(email.trim(),password)
-                    "Registrati" -> auth.createUserWithEmailAndPassword(email.trim(),password)
-                    else -> auth.sendPasswordResetEmail(email.trim())
-                }
-                task.addOnCompleteListener {busy=false;report(it.exception?.localizedMessage ?: if(label=="Recupera password") "Controlla la tua casella email" else "")}
-            }){Text(label)}
-        }
-    }
-}
-
-@Composable
 fun AccountControls(uid:String?,logout:()->Unit,report:(String)->Unit) {
     val context=LocalContext.current
     val prefs=context.getSharedPreferences("registro-native",0)

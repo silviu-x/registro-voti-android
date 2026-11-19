@@ -15,8 +15,8 @@ android {
         applicationId = "it.registrovoti.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "2.1.6"
+        versionCode = 18
+        versionName = "2.2.1"
     }
     buildFeatures {
         compose = true
