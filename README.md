@@ -1,13 +1,32 @@
-# Registro Voti Android 2.1.6
+# Registro Voti per Android
 
-Interfaccia nativa in Kotlin e Jetpack Compose. Apri la cartella contenente settings.gradle.kts in Android Studio. Per aggiornare il progetto Windows già funzionante, chiudi il progetto e unisci il contenuto di questo archivio alla sua cartella android. Conserva il tuo file app/google-services.json e il keystore che hai usato per installare l’app. L’archivio include il wrapper di Gradle 8.9. I sorgenti web della versione precedente sono esclusi dalla build.
+**Che voto mi serve nella prossima verifica per arrivare alla media del 7?** Registro Voti è un’app per studenti che raccoglie i voti per materia, mostra come cambia la media durante il quadrimestre e ti aiuta a fissare un obiettivo per le prossime prove.
 
-Per una nuova installazione, registra il pacchetto `it.registrovoti.mobile` nel tuo progetto Firebase e copia il file di configurazione scaricato in `app/google-services.json` prima di compilare.
+## Cosa puoi fare
 
-Per aggiornare una tua installazione, utilizza lo stesso progetto Firebase e la stessa firma di prima. La build usa Gradle 8.9, JDK 17 e SDK 35. Esegui :app:assembleDebug con Run Anything, oppure dalla radice del progetto in PowerShell esegui .\gradlew.bat :app:assembleDebug. L’APK di prova si trova in app/build/outputs/apk/debug/app-debug.apk.
+- **Segui una materia nel tempo.** Inserisci, modifica o elimina i voti. Nel grafico puoi selezionare una prova per leggere la data, il voto e la media che avevi in quel momento.
+- **Calcola che voto ti serve.** Scegli una materia e la media che vuoi raggiungere. Il simulatore calcola il voto necessario e mostra come cambia il risultato se hai ancora più prove a disposizione.
+- **Organizza il registro.** Aggiungi le tue materie e imposta la data di fine del primo quadrimestre per consultare i voti del periodo che ti interessa.
+- **Scegli dove salvare i dati.** Il registro ospite funziona in locale. Con lo stesso account Firebase puoi ritrovare i voti anche sul sito. Per confermare le modifiche dell’account serve una connessione. Dalle impostazioni puoi esportare e importare un backup JSON.
 
-## Dati già presenti
-Prima di passare alla versione nativa sincronizza l'account o esporta un backup JSON dall'app precedente, soprattutto se usavi il registro ospite. La cache della WebView e l'archivio ospite nativo sono separati. Accedi allo stesso account per recuperare i dati cloud, oppure importa il JSON dalle impostazioni. L'account usa transazioni Firestore e richiede una connessione per confermare le modifiche. Il registro ospite funziona in locale.
+## Installazione
 
-## Verifica prima della distribuzione privata
-Con un account di prova controlla login, inserimento, modifica e cancellazione sul telefono e verifica il risultato sul sito. Esporta un backup e importalo nel registro ospite. Prova i filtri e il simulatore su dati conosciuti. Per la release privata usa la tua firma release, registra la relativa SHA-1 in Firebase e conserva il keystore per gli aggiornamenti.
+Serve **Android 8.0 o successivo**. Apri la sezione **Releases** del repository, scegli la versione desiderata e scarica il file APK dagli **Assets**. Per la versione 2.1.6 il file si chiama `registro-2.1.6.apk`. Aprilo sul telefono e segui le istruzioni di Android.
+
+**Se aggiorni dalla versione con WebView**, sincronizza i voti oppure esporta un backup JSON prima di installare la 2.1.6. Il nuovo registro ospite usa un archivio locale separato. Dopo l’aggiornamento accedi allo stesso account per recuperare i voti sincronizzati oppure importa il backup dalle impostazioni.
+
+## Compilare dai sorgenti
+
+L’interfaccia Android è scritta in **Kotlin** con **Jetpack Compose**. Il progetto usa Firebase Authentication per l’accesso e Cloud Firestore per i dati sincronizzati.
+
+1. Apri in Android Studio la cartella che contiene `settings.gradle.kts`. Usa JDK 17 e installa Android SDK 35.
+2. Configura in Firebase l’app Android con identificativo `it.registrovoti.mobile` e inserisci il relativo `google-services.json` nella cartella `app/`. Per utilizzare l’accesso Google, registra anche l’impronta SHA-1 della firma usata.
+3. Dalla radice del progetto esegui il comando di build. Su Windows, in PowerShell, usa
+
+   ```powershell
+   .\gradlew.bat :app:assembleDebug
+   ```
+
+   Su macOS o Linux usa `bash gradlew :app:assembleDebug`.
+
+L’APK di prova viene creato in `app/build/outputs/apk/debug/app-debug.apk`.
