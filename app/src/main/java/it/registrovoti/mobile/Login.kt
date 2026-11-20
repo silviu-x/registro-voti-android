@@ -11,6 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -24,18 +26,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 
-internal fun Modifier.livingBackground(): Modifier = composed {
+internal fun Modifier.registerBackground(): Modifier = composed {
     val palette = LocalGradient.current
     val accent = MaterialTheme.colorScheme.primary
-    val motion = rememberInfiniteTransition(label = "Sfondo")
-    val phase = motion.animateFloat(0f, 1f, infiniteRepeatable(
-        tween(16000, easing = SmoothMotion), RepeatMode.Reverse), label = "Luce")
-    background(Brush.horizontalGradient(palette)).drawBehind {
-        val t = phase.value
+    background(Brush.horizontalGradient(palette)).drawWithCache {
         val radius = size.maxDimension * 0.74f
-        val center = Offset(size.width * (0.10f + 0.8f * t), size.height * (0.32f + 0.42f * t))
-        drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.20f), Color.Transparent),
-            center = center, radius = radius), radius, center = center)
+        val glow = Brush.radialGradient(listOf(accent.copy(alpha = 0.20f), Color.Transparent),
+            center = Offset.Zero, radius = radius.coerceAtLeast(1f))
+        onDrawBehind {
+            translate(size.width * 0.30f, size.height * 0.40f) {
+                drawCircle(glow, radius, Offset.Zero)
+            }
+        }
     }
 }
 
@@ -48,8 +50,9 @@ internal fun LoginScreen(modifier: Modifier, auth: FirebaseAuth, busy: Boolean, 
     val colors = MaterialTheme.colorScheme
     val paper = Brush.horizontalGradient(listOf(colors.primary, lerp(colors.primary, colors.surface, 0.12f)))
     val ink = colors.onPrimary
+    val entrance = rememberEntrance()
     Column(modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.fillMaxWidth().drawBehind {
+        Column(Modifier.fillMaxWidth().enterSection(entrance).drawBehind {
             val w = size.width
             val h = size.height
             val wave = Path().apply {
@@ -75,7 +78,7 @@ internal fun LoginScreen(modifier: Modifier, auth: FirebaseAuth, busy: Boolean, 
                 color = ink, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(44.dp))
         }
-        Column(Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+        Column(Modifier.enterSection(entrance, 0.24f).widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val fieldColors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = colors.surface, unfocusedContainerColor = colors.surface,

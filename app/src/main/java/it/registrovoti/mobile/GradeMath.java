@@ -1,5 +1,7 @@
 package it.registrovoti.mobile;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,30 @@ public final class GradeMath {
         double subjectSum = 0;
         for (double[] entry : totals.values()) subjectSum += entry[0] / entry[1];
         return subjectSum / totals.size();
+    }
+
+    public static List<Double> dailyAverages(Collection<? extends List<? extends Map<?, ?>>> days, boolean bySubject) {
+        List<Double> points = new ArrayList<>(days.size());
+        Map<Object, double[]> totals = new HashMap<>();
+        double sum = 0;
+        double sumOfMeans = 0;
+        int count = 0;
+        for (List<? extends Map<?, ?>> day : days) {
+            for (Map<?, ?> row : day) {
+                double score = ((Number) row.get("value")).doubleValue();
+                sum += score;
+                count++;
+                if (bySubject) {
+                    double[] subject = totals.computeIfAbsent(row.get("subject"), k -> new double[2]);
+                    if (subject[1] > 0) sumOfMeans -= subject[0] / subject[1];
+                    subject[0] += score;
+                    subject[1]++;
+                    sumOfMeans += subject[0] / subject[1];
+                }
+            }
+            points.add(bySubject ? sumOfMeans / totals.size() : sum / count);
+        }
+        return points;
     }
 
     public static double needed(List<? extends Map<?, ?>> rows, String subject, double target,

@@ -38,6 +38,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -74,11 +79,11 @@ class MainActivity : ComponentActivity() {
         }
         val account = user
         val screen = Modifier.fillMaxSize()
-            .livingBackground()
+            .registerBackground()
             .safeDrawingPadding()
             .imePadding()
         if (account == null && !guest) {
-            EnterScreen { LoginScreen(screen, auth, busy, { busy = it }, message, { message = it },
+            LoginScreen(screen, auth, busy, { busy = it }, message, { message = it },
                 guest = { guest = true }, google = {
                     busy = true
                     message = ""
@@ -97,10 +102,10 @@ class MainActivity : ComponentActivity() {
                             message = e.localizedMessage ?: "Accesso interrotto"
                         }
                     }
-                }) }
+                })
         } else Box(screen) {
             key(account?.uid) {
-                EnterScreen { Register(account?.uid) { guest=false; auth.signOut() } }
+                Register(account?.uid) { guest=false; auth.signOut() }
             }
         }
     }
@@ -179,21 +184,38 @@ private fun Register(uid: String?, logout: () -> Unit) {
     val year=today.year - if(today.monthValue<9) 1 else 0
     val cutoff=(data["settings"] as? Map<*,*>)?.get("cutoff")?.toString() ?: "${year+1}-01-31"
     var period by rememberSaveable { mutableStateOf("Anno") }
-    val rows=grades(data).filter { when(period) {
+    val rows = remember(data, period, cutoff) { grades(data).filter { when(period) {
         "1° quadr." -> it["date"].toString()<=cutoff
         "2° quadr." -> it["date"].toString()>cutoff
         else -> true
-    } }
-    val groups = rows.groupBy { it["subject"] }
+    } } }
+    val groups = remember(rows) { rows.groupBy { it["subject"] } }
     val mode = (data["settings"] as? Map<*,*>)?.get("mode")
-    val general = GradeMath.average(rows,mode!="all")
+    val general = remember(rows, mode) { GradeMath.average(rows, mode != "all") }
+    val destinations = listOf("Panoramica" to Icons.Outlined.Home, "Materie" to Icons.AutoMirrored.Outlined.List,
+            "Voti" to Icons.Outlined.CheckCircle, "Pagella" to Icons.Outlined.DateRange,
+            "Simulatore" to Icons.Outlined.AddCircle, "Impostazioni" to Icons.Outlined.Settings)
+    val entrance = rememberEntrance()
     var tab by rememberSaveable { mutableStateOf("Panoramica") }
     androidx.activity.compose.BackHandler(enabled=tab!="Panoramica" && !editing){tab="Panoramica"}
     Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-        AnimatedContent(targetState = tab, modifier = Modifier.fillMaxSize(), label = "Sezione",
-            transitionSpec = { (fadeIn(tween(270, easing = SmoothMotion)) + slideInHorizontally(tween(320, easing = SmoothMotion)) { it / 19 }) togetherWith fadeOut(tween(190, easing = SmoothMotion)) }) { visibleTab ->
-            LazyColumn(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth().enterSection(entrance)) {
+        val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+        val initialTab = remember { tab }
+        var switched by remember { mutableStateOf(false) }
+        val visibleTab = tab
+        val page = remember(visibleTab) { Animatable(if (switched || visibleTab != initialTab) 0f else 1f) }
+        LaunchedEffect(page) {
+            if (page.value < 1f) {
+                switched = true
+                page.animateTo(1f, tween(175, easing = LinearOutSlowInEasing))
+            }
+        }
+        pageState.SaveableStateProvider(visibleTab) {
+            LazyColumn(Modifier.fillMaxSize().graphicsLayer {
+                translationY = 7.dp.toPx() * (1f - page.value)
+                alpha = 0.84f + 0.16f * page.value
+            },verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) {
                 if (status.isNotBlank()) item { Text(status) }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -246,10 +268,8 @@ private fun Register(uid: String?, logout: () -> Unit) {
                         }
                         item { BluePanel {
                             Text("Andamento della media",Modifier.fillMaxWidth(),fontWeight=FontWeight.Bold)
-                            val timeline=rows.groupBy{it["date"].toString()}.toSortedMap()
-                            val history=mutableListOf<Map<*,*>>()
-                            val points=timeline.values.map { day -> history.addAll(day)
-                                if(mode=="all") average(history) else history.groupBy{it["subject"]}.values.map(::average).average() }
+                            val timeline = remember(rows) { rows.groupBy { it["date"].toString() }.toSortedMap() }
+                            val points = remember(timeline, mode) { GradeMath.dailyAverages(timeline.values, mode != "all") }
                             var selectedDay by remember(timeline.keys.toList()) {mutableIntStateOf(-1)}
                             if(points.isEmpty()) Text("Aggiungi il primo voto.")
                             else GradeChart(points,timeline.keys.toList(),selectedDay) { selectedDay=it }
@@ -384,26 +404,39 @@ private fun Register(uid: String?, logout: () -> Unit) {
         }
         SnackbarHost(savedNotice, Modifier.align(Alignment.BottomCenter))
         }
-        val destinations = listOf("Panoramica" to Icons.Outlined.Home, "Materie" to Icons.AutoMirrored.Outlined.List,
-            "Voti" to Icons.Outlined.CheckCircle, "Pagella" to Icons.Outlined.DateRange,
-            "Simulatore" to Icons.Outlined.AddCircle, "Impostazioni" to Icons.Outlined.Settings)
         val minimumTabWidth = 62.dp * LocalDensity.current.fontScale
-        val barSurface = MaterialTheme.colorScheme.surface
+        val colors = MaterialTheme.colorScheme
+        val barSurface = androidx.compose.ui.graphics.lerp(colors.surfaceBright, colors.primaryContainer, .32f)
+        val barShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         LazyRow(
-            modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                .background(Brush.verticalGradient(listOf(barSurface.copy(alpha = 0.12f), barSurface.copy(alpha = 0.65f))))
+            modifier = Modifier.fillMaxWidth().enterSection(entrance, 0.20f)
+                .shadow(9.dp, barShape, clip = false)
+                .background(barSurface, barShape)
+                .clip(barShape)
                 .padding(vertical = 4.dp)
         ) {
             items(destinations) { (name, icon) ->
                 val selected = name == tab
-                Column(Modifier.widthIn(min = minimumTabWidth).fillParentMaxWidth(1f / destinations.size).pressMotion().selectable(selected = selected, onClick = { tab = name }).heightIn(min = 54.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Box(Modifier.size(42.dp, 26.dp).background(if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                        RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                val interaction = remember { MutableInteractionSource() }
+                val focused by interaction.collectIsFocusedAsState()
+                val tint by animateColorAsState(
+                    if (selected || focused) colors.primary else colors.onSurfaceVariant,
+                    animationSpec = tween(150), label = "Colore scheda"
+                )
+                Column(
+                    Modifier.widthIn(min = minimumTabWidth).fillParentMaxWidth(1f / destinations.size)
+                        .pressMotion().selectable(
+                            selected = selected, role = Role.Tab, interactionSource = interaction,
+                            indication = null, onClick = { tab = name }
+                        ).heightIn(min = 54.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
+                ) {
+                    Box(Modifier.size(42.dp, 26.dp), contentAlignment = Alignment.Center) {
+                        Icon(icon, null, Modifier.size(20.dp), tint = tint)
                     }
-                    Text(name, fontSize = 10.sp, letterSpacing = 0.sp, maxLines = 1)
+                    Text(name, color = tint, fontSize = 10.sp, letterSpacing = 0.sp, maxLines = 1,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        textDecoration = if (focused) androidx.compose.ui.text.style.TextDecoration.Underline else null)
                 }
             }
         }
@@ -504,7 +537,8 @@ internal fun BluePanel(centered:Boolean=false, content:@Composable ColumnScope.(
 @Composable
 private fun Gauge(score:Double) {
     val target = if (score.isFinite()) score.toFloat() else 0f
-    val shown by animateFloatAsState(target, tween(620, easing = SmoothMotion), label = "Media generale")
+    val shown = remember { Animatable(0f) }
+    LaunchedEffect(target) { shown.animateTo(target, tween(520, easing = LinearOutSlowInEasing)) }
     val colors = MaterialTheme.colorScheme
     Box(Modifier.fillMaxWidth().aspectRatio(2f),contentAlignment=Alignment.BottomCenter) {
         Canvas(Modifier.fillMaxSize()) {
@@ -517,12 +551,12 @@ private fun Gauge(score:Double) {
                 val w=size.width*.129f
                 val h=size.width*.076f
                 rotate(angle,center) {
-                    val fill = (shown - index).coerceIn(0f, 1f)
+                    val fill = (shown.value - index).coerceIn(0f, 1f)
                     drawRoundRect(androidx.compose.ui.graphics.lerp(colors.surfaceVariant, colors.primary, fill),
                         Offset(center.x-w/2,center.y-h/2),Size(w,h),CornerRadius(h*.24f))
                 }
             }
         }
-        Text(display(if (score.isFinite() && shown != target) shown.toDouble() else score),fontSize=42.sp,fontWeight=FontWeight.Bold,lineHeight=46.sp)
+        Text(display(score),fontSize=42.sp,fontWeight=FontWeight.Bold,lineHeight=46.sp)
     }
 }
