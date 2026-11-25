@@ -60,11 +60,26 @@ fun AccountControls(uid:String?,logout:()->Unit,report:(String)->Unit) {
 }
 
 @Composable
-fun PrivacyDialog(close:()->Unit) {
-    AlertDialog(onDismissRequest=close,title={Text("Privacy e copyright")},text={
+fun PrivacyDialog(firstRead:Boolean=false,close:()->Unit) {
+    val links=androidx.compose.ui.platform.LocalUriHandler.current
+    var details by remember { mutableStateOf(false) }
+    AlertDialog(onDismissRequest={if(!firstRead) close()},title={Text("Privacy e copyright")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Text("In modalità ospite il registro resta su questo dispositivo. Con un account, Firebase gestisce l’accesso e sincronizza voti e materie nel tuo documento privato.")
             Text("Puoi correggere i dati, scaricarne una copia o eliminare l’account dalle impostazioni. I file esportati e le copie su altri dispositivi vanno eliminati separatamente.")
+            Text(androidx.compose.ui.res.stringResource(R.string.privacy_controller))
+            Text("Se sei minorenne, puoi tenere il tuo registro come ospite. Per importare uno screenshot ritaglia solo i tuoi voti ed evita nomi o dati di altre persone.")
+            TextButton(onClick={details=!details}) { Text(if(details) "▾ Conservazione, diritti e fornitori" else "▸ Conservazione, diritti e fornitori") }
+            if(details) {
+                Text("Il registro usa la memoria del dispositivo per i dati locali e le preferenze. I servizi di accesso e sincronizzazione ricevono dati tecnici di connessione, come l’indirizzo IP. Il registro non include pubblicità o strumenti di analisi del pubblico.")
+                Text("Per accesso e sincronizzazione, la base giuridica indicata è l’esecuzione del servizio richiesto (art. 6, par. 1, lett. b GDPR). Firebase Authentication tratta identificativo ed email. Firestore conserva materie, voti, date, tipo di prova, note e impostazioni. I dati del registro restano nel cloud fino alla cancellazione.")
+                Text("Gli screenshot sono letti sul dispositivo con Google ML Kit. Solo i voti confermati entrano nel registro. ML Kit può inviare a Google metriche tecniche di utilizzo e prestazioni.")
+                Text("Puoi chiedere accesso, rettifica, cancellazione, limitazione e, quando applicabile, portabilità dei dati. Puoi presentare un reclamo al Garante.")
+                Text("I fornitori possono trattare dati anche fuori dallo Spazio economico europeo. Consulta le informazioni di Google su localizzazione e garanzie per i trasferimenti.")
+                TextButton(onClick={links.openUri("https://firebase.google.com/support/privacy")}) { Text("Privacy e trattamento dei dati in Firebase") }
+                TextButton(onClick={links.openUri("https://developers.google.com/ml-kit/terms")}) { Text("Privacy di ML Kit") }
+                TextButton(onClick={links.openUri("https://www.garanteprivacy.it/")}) { Text("Garante Privacy") }
+            }
             Text("© Registro Voti. I contenuti inseriti restano dei rispettivi autori.")
         }
     },confirmButton={TextButton(onClick=close){Text("Ho letto")}})

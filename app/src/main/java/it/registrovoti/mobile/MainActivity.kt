@@ -66,6 +66,15 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Session() {
+        val prefs=remember { getSharedPreferences("registro-native",0) }
+        var seen by remember { mutableStateOf(prefs.getBoolean("privacy-v3",false)) }
+        if (!seen) {
+            PrivacyDialog(firstRead=true) {
+                prefs.edit().putBoolean("privacy-v3",true).apply()
+                seen=true
+            }
+            return
+        }
         val auth = remember { FirebaseAuth.getInstance() }
         var user by remember { mutableStateOf(auth.currentUser) }
         var message by remember { mutableStateOf("") }
@@ -195,27 +204,19 @@ private fun Register(uid: String?, logout: () -> Unit) {
     val destinations = listOf("Panoramica" to Icons.Outlined.Home, "Materie" to Icons.AutoMirrored.Outlined.List,
             "Voti" to Icons.Outlined.CheckCircle, "Pagella" to Icons.Outlined.DateRange,
             "Simulatore" to Icons.Outlined.AddCircle, "Impostazioni" to Icons.Outlined.Settings)
-    val entrance = rememberEntrance()
     var tab by rememberSaveable { mutableStateOf("Panoramica") }
     androidx.activity.compose.BackHandler(enabled=tab!="Panoramica" && !editing){tab="Panoramica"}
     Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxWidth().enterSection(entrance)) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-        val initialTab = remember { tab }
-        var switched by remember { mutableStateOf(false) }
         val visibleTab = tab
-        val page = remember(visibleTab) { Animatable(if (switched || visibleTab != initialTab) 0f else 1f) }
-        LaunchedEffect(page) {
-            if (page.value < 1f) {
-                switched = true
-                page.animateTo(1f, tween(175, easing = LinearOutSlowInEasing))
-            }
-        }
         pageState.SaveableStateProvider(visibleTab) {
-            LazyColumn(Modifier.fillMaxSize().graphicsLayer {
-                translationY = 7.dp.toPx() * (1f - page.value)
-                alpha = 0.84f + 0.16f * page.value
-            },verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) {
+            val opacity = remember { Animatable(0.82f) }
+            LaunchedEffect(opacity) {
+                opacity.animateTo(1f, tween(140, easing = LinearOutSlowInEasing))
+            }
+            LazyColumn(Modifier.fillMaxSize().graphicsLayer { alpha = opacity.value },
+                verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) {
                 if (status.isNotBlank()) item { Text(status) }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -409,7 +410,7 @@ private fun Register(uid: String?, logout: () -> Unit) {
         val barSurface = androidx.compose.ui.graphics.lerp(colors.surfaceBright, colors.primaryContainer, .32f)
         val barShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         LazyRow(
-            modifier = Modifier.fillMaxWidth().enterSection(entrance, 0.20f)
+            modifier = Modifier.fillMaxWidth()
                 .shadow(9.dp, barShape, clip = false)
                 .background(barSurface, barShape)
                 .clip(barShape)
@@ -441,6 +442,11 @@ private fun Register(uid: String?, logout: () -> Unit) {
             }
         }
     }
+    var importing by remember(uid) { mutableStateOf(false) }
+    if(importing) ScreenshotDialog(data,commit,{importing=false}) { count ->
+        importing=false
+        noticeScope.launch { savedNotice.showSnackbar("$count voti importati") }
+    }
     if(editing) {
         var saving by remember { mutableStateOf(false) }
         var another by remember { mutableStateOf(false) }
@@ -450,6 +456,10 @@ private fun Register(uid: String?, logout: () -> Unit) {
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
                     Text(if(selected==null) "Nuovo voto" else "Modifica voto",style=MaterialTheme.typography.titleLarge)
                     AnimatedVisibility(status.isNotEmpty()) { Text(status) }
+                    if(selected==null) Button(enabled=!saving,onClick={editing=false;importing=true},
+                        modifier=Modifier.fillMaxWidth().padding(vertical=8.dp).heightIn(min=54.dp)) {
+                        Text("Importa da screenshot",style=MaterialTheme.typography.titleMedium)
+                    }
                     if(selected==null) Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=another,onCheckedChange={another=it});Text("Inserisci un altro voto dopo il salvataggio")}
                     key(formKey){ EnterScreen { GradeForm(subjects(data),selected,onCancel={editing=false},onSave={name,score,date,type,note,done ->
                         saving=true; status=""

@@ -15,8 +15,11 @@ android {
         applicationId = "it.registrovoti.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "2.2.4"
+        if (providers.gradleProperty("compactArm64").orNull == "true") {
+            ndk { abiFilters += "arm64-v8a" }
+        }
+        versionCode = 29
+        versionName = "3.0.4"
     }
     buildFeatures {
         compose = true
@@ -24,6 +27,7 @@ android {
     sourceSets.getByName("main").assets.setSrcDirs(emptyList<String>())
 }
 dependencies {
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation(platform("com.google.firebase:firebase-bom:33.10.0"))

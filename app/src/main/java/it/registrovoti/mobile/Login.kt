@@ -44,6 +44,8 @@ internal fun Modifier.registerBackground(): Modifier = composed {
 @Composable
 internal fun LoginScreen(modifier: Modifier, auth: FirebaseAuth, busy: Boolean, setBusy: (Boolean) -> Unit,
                          message: String, report: (String) -> Unit, google: () -> Unit, guest: () -> Unit) {
+    var privacy by rememberSaveable { mutableStateOf(false) }
+    if(privacy) PrivacyDialog { privacy=false }
     var register by rememberSaveable { mutableStateOf(false) }
     var email by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -80,6 +82,7 @@ internal fun LoginScreen(modifier: Modifier, auth: FirebaseAuth, busy: Boolean, 
         }
         Column(Modifier.enterSection(entrance, 0.24f).widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            TextButton(onClick={privacy=true}) { Text("Come vengono usati i tuoi dati") }
             val fieldColors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = colors.surface, unfocusedContainerColor = colors.surface,
                 unfocusedBorderColor = Color.Transparent)
